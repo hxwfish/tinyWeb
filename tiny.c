@@ -22,41 +22,16 @@ int main(int argc, char **argv)
 	port = atoi(argv[1]);
 
 	listenfd = Open_listenfd(port);
+	printf("Open_listenfd=%d\n", listenfd);
 
 	while (1) {
 		clientlen = sizeof(clientaddr);
 		connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
+		printf("Accept connect:%d\n", connfd);
 		doit(connfd);
 		close(connfd);
 	}
 }
-
-/*
-int open_listenfd(int port)
-{
-	int listenfd, optval = 1;
-	struct sockaddr_in serveraddr;
-
-	if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-		return -1;
-
-	if (setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR,
-		(const void *)&optval, sizeof(int)) < 0)
-		return -1;
-
-	bzero((char *)&serveraddr, sizeof(serveraddr));
-	serveraddr.sin_family = AF_INET;
-	serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	serveraddr.sin_port = htons((unsigned short)port);
-
-	if (bind(listenfd, (SA *)&serveraddr, sizeof(serveraddr)) < 0)
-		return -1;
-
-	if (listen(listenfd, LISTENQ) < 0)
-		return -1;
-
-	return listenfd;
-}*/
 
 void doit(int fd)
 {
@@ -69,9 +44,17 @@ void doit(int fd)
 	rio_readinitb(&rio, fd);
 	rio_readlineb(&rio, buf, MAXLINE);
 	sscanf(buf, "%s %s %s", method, uri, version);
+	printf("doit ==> input buf:%s\n", buf);
 	if (strcasecmp(method, "GET")) {
 		clienterror(fd, method, "501", "Not Implemented",
 			"Tiny does not implement this method");
+		return;
+	}
+	read_requesthdrs(&rio);
+
+	is_static = parse_uri(uri, filename, cgiargs);
+	if (stat(filename, &sbuf) < 0) {
+		clienterror(fd, filename, "404", "Not found", "Tiny could't find this file");
 		return;
 	}
 
